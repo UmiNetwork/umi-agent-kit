@@ -2095,50 +2095,77 @@ async setConstructorValues(contractAddress, constructorArgs, callerWallet) {
     }
   }
 
-
 /**
-   * Deploy with configuration object - NEW METHOD
-   */
-  /**
-   * Deploy with configuration object
-   */
-  async deployWithConfig(contractsPath, deployerWallet, configObject = {}) {
-    try {
-      console.log(`🚀 Starting config object deployment...`);
-      
-      // Scan contracts using local method
-      const contracts = await this.scanContractsFolder(contractsPath);
-      
-      // Deploy contracts with configuration
-      const results = {};
-      for (const contract of contracts) {
-        const contractConfig = configObject[contract.name] || {};
-        
-        console.log(`🚀 Deploying ${contract.name} with config object...`);
-        
-        // Resolve references in config
-        const resolvedArgs = await this.resolveConfigArgs(contractConfig, results);
-        
-        // Deploy using embedded engine
-        let result;
-        if (contract.content.includes('module ')) {
-          result = await this.embeddedEngine.deployMoveContract(contract, deployerWallet, resolvedArgs);
-        } else {
-          result = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet, resolvedArgs);
-        }
-        
-        results[contract.name] = result;
-        console.log(`✅ ${contract.name} deployed: ${result.address}`);
-      }
-      
-      console.log(`🎉 Config deployment complete! ${Object.keys(results).length} contract(s) deployed.`);
-      return results;
-      
-    } catch (error) {
-      throw new Error(`Config deployment failed: ${error.message}`);
-    }
+ * Show deployment summary
+ */
+showDeploymentSummary(results) {
+  const successful = Object.entries(results).filter(([_, result]) => !result.error);
+  const failed = Object.entries(results).filter(([_, result]) => result.error);
+  
+  console.log(`\n📊 DEPLOYMENT SUMMARY:`);
+  console.log(`✅ Successful: ${successful.length}`);
+  console.log(`❌ Failed: ${failed.length}`);
+  
+  if (successful.length > 0) {
+    console.log('\n🎉 Successfully deployed:');
+    successful.forEach(([name, result]) => {
+      console.log(`  - ${name}: ${result.address}`);
+    });
   }
-
+  
+  if (failed.length > 0) {
+    console.log('\n💥 Failed deployments:');
+    failed.forEach(([name, result]) => {
+      console.log(`  - ${name}: ${result.error}`);
+    });
+  }
+}
+/**
+ * Deploy contracts with configuration object
+ * @param {string} contractsPath - Path to contracts folder
+ * @param {UmiWallet} deployerWallet - Wallet to deploy from
+ * @param {object} config - Configuration object with constructor args
+ * @returns {object} Object with all deployed contracts
+ */
+async deployWithConfig(contractsPath, deployerWallet, config = {}) {
+  try {
+    console.log(`🚀 Deploying contracts with configuration...`);
+    
+    // Scan contracts folder
+    const contracts = await this.scanContractsFolder(contractsPath);
+    console.log(`📁 Found ${contracts.length} contracts`);
+    
+    // Deploy contracts with config
+    const results = {};
+    for (const contract of contracts) {
+      try {
+        const contractConfig = config[contract.name] || {};
+        console.log(`🚀 Deploying ${contract.name} with config...`);
+        
+        if (contract.content.includes('module ')) {
+          console.log(`⚠️ Skipping Move contract ${contract.name} - not yet supported`);
+          results[contract.name] = { error: 'Move contracts not yet supported' };
+        } else {
+          const result = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet, contractConfig);
+          results[contract.name] = result;
+          console.log(`✅ ${contract.name} deployed: ${result.address}`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to deploy ${contract.name}:`, error.message);
+        results[contract.name] = { error: error.message };
+      }
+    }
+    
+    // Show summary
+    this.showDeploymentSummary(results);
+    
+    console.log(`🎉 Config deployment complete! ${Object.keys(results).length} contracts processed.`);
+    return results;
+    
+  } catch (error) {
+    throw new Error(`Config deployment failed: ${error.message}`);
+  }
+}
 
 // ====== ADDITIONAL DEPLOYMENT UTILITIES ======
 // FIXED: Enhanced existing deployWithConstructor method
@@ -2177,37 +2204,88 @@ async deployWithConstructor(contract, deployerWallet, constructorArgs) {
 }
 
  /**
-   * Deploy a single contract - NEW METHOD
-   */
-   async deploySingleContract(contractPath, deployerWallet, constructorArgs = {}) {
-    try {
-      console.log(`🚀 Deploying single contract: ${contractPath}`);
-      
-      // Read contract file using fs import
-      const contractContent = await fs.readFile(contractPath, 'utf8');
-      const contractName = path.basename(contractPath).replace(/\.(move|sol)$/, '');
-      
-      const contract = {
-        name: contractName,
-        content: contractContent,
-        path: contractPath
-      };
-      
-      // Deploy based on contract type using embedded engine
-      let result;
-      if (contract.content.includes('module ')) {
-        result = await this.embeddedEngine.deployMoveContract(contract, deployerWallet, constructorArgs);
-      } else {
-        result = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet, constructorArgs);
-      }
-      
-      console.log(`✅ Contract deployed successfully!`);
-      return result;
-      
-    } catch (error) {
-      throw new Error(`Single contract deployment failed: ${error.message}`);
+ * Deploy a single contract from file
+ * @param {string} contractPath - Path to .sol or .move file
+ * @param {UmiWallet} deployerWallet - Wallet to deploy from
+ * @param {object} constructorArgs - Optional constructor arguments
+ * @returns {object} Deployment result with address, hash, abi
+ */
+async deployContract(contractPath, deployerWallet, constructorArgs = {}) {
+  try {
+    console.log(`🚀 Deploying contract: ${contractPath}`);
+    
+    // Read contract file
+    const contractContent = await fs.readFile(contractPath, 'utf8');
+    const contractName = path.basename(contractPath).replace(/\.(sol|move)$/, '');
+    
+    const contract = {
+      name: contractName,
+      content: contractContent,
+      path: contractPath
+    };
+    
+    // Deploy using working embedded engine
+    let result;
+    if (contract.content.includes('module ')) {
+      // Move contract (placeholder for now)
+      throw new Error('Move contract deployment not yet implemented. Use Solidity contracts for now.');
+    } else {
+      // Solidity contract using your working method
+      result = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet, constructorArgs);
     }
+    
+    console.log(`✅ Contract deployed successfully!`);
+    return result;
+    
+  } catch (error) {
+    throw new Error(`Contract deployment failed: ${error.message}`);
   }
+}
+
+/**
+ * Deploy multiple contracts from a folder
+ * @param {string} contractsPath - Path to folder containing .sol/.move files
+ * @param {UmiWallet} deployerWallet - Wallet to deploy from
+ * @returns {object} Object with all deployed contracts
+ */
+async deployContracts(contractsPath, deployerWallet) {
+  try {
+    console.log(`🚀 Deploying contracts from: ${contractsPath}`);
+    
+    // Scan contracts folder
+    const contracts = await this.scanContractsFolder(contractsPath);
+    console.log(`📁 Found ${contracts.length} contracts to deploy`);
+    
+    // Deploy all contracts
+    const results = {};
+    for (const contract of contracts) {
+      try {
+        console.log(`🚀 Deploying ${contract.name}...`);
+        
+        if (contract.content.includes('module ')) {
+          console.log(`⚠️ Skipping Move contract ${contract.name} - not yet supported`);
+          results[contract.name] = { error: 'Move contracts not yet supported' };
+        } else {
+          const result = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet);
+          results[contract.name] = result;
+          console.log(`✅ ${contract.name} deployed: ${result.address}`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to deploy ${contract.name}:`, error.message);
+        results[contract.name] = { error: error.message };
+      }
+    }
+    
+    // Show summary
+    this.showDeploymentSummary(results);
+    
+    console.log(`🎉 Deployment complete! ${Object.keys(results).length} contracts processed.`);
+    return results;
+    
+  } catch (error) {
+    throw new Error(`Multiple contract deployment failed: ${error.message}`);
+  }
+}
 /**
  * Get contract functions after deployment
  * Returns list of available functions for a deployed contract
