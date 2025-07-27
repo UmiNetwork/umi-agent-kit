@@ -4,3 +4,4 @@ testing_fixes.js
 test-embedded-deployment.js
 examples/
 debug-test.js
+diagnostic-scripts.js
