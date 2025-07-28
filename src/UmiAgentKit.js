@@ -2,15 +2,13 @@
 import { UmiClient } from './client/UmiClient.js';
 import { WalletManager } from './wallet/WalletManager.js';
 import { TransferManager } from './transfer/TransferManager.js';
-import { TokenManager } from './token/TokenManager.js';
-import { NFTManager } from './nft/NFTManager.js';
 import { ServerMultisigManager } from './multisig/ServerMultisigManager.js';
 import { AIManager } from './ai/AIManager.js'; // NEW: AI Integration
 import { validateConfig } from './config.js';
 import { parseEther } from 'viem';
 import { createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { MultiContractDeployer } from './deployment/MultiContractDeployer.js';
+
 import { ERC1155Manager } from './erc1155/ERC1155Manager.js';
 import { EmbeddedDeploymentEngine } from './deployment/EmbeddedDeploymentEngine.js';
 import { InlineOpenZeppelinTemplates } from './templates/InlineOpenZeppelinTemplates.js';
@@ -41,11 +39,9 @@ export class UmiAgentKit {
     // Initialize transfer manager
     this.transferManager = new TransferManager(this.client, this.client.chain);
 
-    // Initialize token manager
-    this.tokenManager = new TokenManager(this.client, this.client.chain);
+   
 
-    // Initialize NFT manager (supports both ERC-721 and Move)
-    this.nftManager = new NFTManager(this.client, this.client.chain);
+  
 
     // Initialize multisig manager with server wallets
     if (this.config.multisigEnabled) {
@@ -56,8 +52,7 @@ export class UmiAgentKit {
     // AI Manager will be initialized when enableAI() is called
     this.aiManager = null;
 
-    // Add deployment manager
-    //this.deploymentManager = new MultiContractDeployer(this); // removed - was causing BCS error
+    
  this.embeddedEngine = new EmbeddedDeploymentEngine(this);
     this.erc1155Manager = new ERC1155Manager(this.client, this.client.chain);
 
