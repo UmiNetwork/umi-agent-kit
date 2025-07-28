@@ -25,3 +25,6 @@ test-embedded-deployment.js
 examples/
 debug-test.js
 diagnostic-scripts.js
+diagnostic-scripts/
+test-deployment.js
+test-inline-tokens-nfts.js

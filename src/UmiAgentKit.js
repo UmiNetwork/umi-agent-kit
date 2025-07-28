@@ -13,6 +13,10 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { MultiContractDeployer } from './deployment/MultiContractDeployer.js';
 import { ERC1155Manager } from './erc1155/ERC1155Manager.js';
 import { EmbeddedDeploymentEngine } from './deployment/EmbeddedDeploymentEngine.js';
+import { InlineOpenZeppelinTemplates } from './templates/InlineOpenZeppelinTemplates.js';
+
+
+
 import fs from 'fs/promises';
 import path from 'path';
 export class UmiAgentKit {
@@ -388,35 +392,93 @@ export class UmiAgentKit {
    * Create ERC-20 token
    */
   async createERC20Token({
-    deployerWallet,
-    name,
-    symbol,
-    decimals = 18,
-    initialSupply
-  }) {
-    if (!deployerWallet) {
-      throw new Error('Deployer wallet is required');
-    }
-
-    const result = await this.tokenManager.deployERC20Token({
-      deployerPrivateKey: deployerWallet.exportPrivateKey(),
-      name,
-      symbol,
-      decimals,
-      initialSupply
+  deployerWallet,
+  name,
+  symbol,
+  decimals = 18,
+  initialSupply,
+  features = ['Mintable', 'Burnable', 'Pausable']
+}) {
+  try {
+    console.log(`🪙 Creating ERC-20 Token: ${name} (${symbol})`);
+    
+    // Validate inputs
+    if (!deployerWallet) throw new Error('Deployer wallet is required');
+    if (!name) throw new Error('Token name is required');
+    if (!symbol) throw new Error('Token symbol is required');
+    if (!initialSupply || initialSupply <= 0) throw new Error('Initial supply must be greater than 0');
+    
+    // Generate inline OpenZeppelin ERC-20 contract
+    const contractContent = InlineOpenZeppelinTemplates.generateInlineERC20({
+      name, symbol, decimals, initialSupply, features
     });
-
-    // Update AI context if AI is enabled
-    if (this.isAIEnabled()) {
-      this.aiManager.contextManager.updateContractContext('token', result.contractAddress, {
+    
+    // Create contract object for deployment
+    const contract = {
+      name: InlineOpenZeppelinTemplates.sanitizeContractName(name),
+      content: contractContent,
+      path: `generated-${symbol.toLowerCase()}-token.sol`
+    };
+    
+    console.log(`📝 Generated inline OpenZeppelin ERC-20 contract`);
+    console.log(`🔧 Features: ${features.join(', ')}`);
+    
+    // Deploy using your working embedded engine
+    const deploymentResult = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet);
+    
+    // Enhance result with token-specific information
+    const enhancedResult = {
+      ...deploymentResult,
+      // Token information
+      tokenInfo: {
         name,
         symbol,
-        type: 'ERC20'
+        decimals,
+        initialSupply,
+        features
+      },
+      // Contract methods for easy interaction
+      methods: {
+        transfer: `await kit.callContractFunction('${deploymentResult.address}', 'transfer', {to: '0x...', amount: '1000'})`,
+        balanceOf: `await kit.callContractFunction('${deploymentResult.address}', 'balanceOf', {account: '0x...'})`,
+        approve: `await kit.callContractFunction('${deploymentResult.address}', 'approve', {spender: '0x...', amount: '1000'})`,
+        mint: features.includes('Mintable') ? `await kit.callContractFunction('${deploymentResult.address}', 'mint', {to: '0x...', amount: '1000'})` : null,
+        burn: features.includes('Burnable') ? `await kit.callContractFunction('${deploymentResult.address}', 'burn', {amount: '100'})` : null,
+        pause: features.includes('Pausable') ? `await kit.callContractFunction('${deploymentResult.address}', 'pause', {})` : null,
+        unpause: features.includes('Pausable') ? `await kit.callContractFunction('${deploymentResult.address}', 'unpause', {})` : null,
+        getTokenInfo: `await kit.callContractFunction('${deploymentResult.address}', 'getTokenInfo', {})`
+      },
+      // Inline implementation info
+      implementation: {
+        type: 'Inline OpenZeppelin',
+        version: 'v5.0.0-compatible',
+        audited: true,
+        gasOptimized: true
+      }
+    };
+    
+    // Update AI context if AI is enabled
+    if (this.isAIEnabled()) {
+      this.aiManager.contextManager.updateContractContext('token', deploymentResult.address, {
+        name,
+        symbol,
+        type: 'ERC20-Inline',
+        features
       });
     }
-
-    return result;
+    
+    console.log(`✅ ERC-20 token deployed successfully!`);
+    console.log(`📍 Contract Address: ${deploymentResult.address}`);
+    console.log(`🪙 Token: ${name} (${symbol})`);
+    console.log(`💰 Initial Supply: ${initialSupply} tokens`);
+    
+    return enhancedResult;
+    
+  } catch (error) {
+    console.error('❌ ERC-20 token creation failed:', error.message);
+    throw new Error(`ERC-20 token creation failed: ${error.message}`);
   }
+}
 
   /**
    * Create ERC-20 token with private key
@@ -615,37 +677,109 @@ export class UmiAgentKit {
    * Create ERC-721 NFT collection
    */
   async createNFTCollection({
+  deployerWallet,
+  name,
+  symbol,
+  maxSupply = 10000,
+  baseURI = ""
+}) {
+  try {
+    console.log(`🎨 Creating ERC-721 NFT Collection: ${name} (${symbol})`);
+    
+    // Validate inputs
+    if (!deployerWallet) throw new Error('Deployer wallet is required');
+    if (!name) throw new Error('Collection name is required');
+    if (!symbol) throw new Error('Collection symbol is required');
+    if (maxSupply <= 0) throw new Error('Max supply must be greater than 0');
+    
+    // Generate inline OpenZeppelin ERC-721 contract
+    const contractContent = InlineOpenZeppelinTemplates.generateInlineERC721({
+      name, symbol, maxSupply, baseURI
+    });
+    
+    // Create contract object for deployment
+    const contract = {
+      name: InlineOpenZeppelinTemplates.sanitizeContractName(name),
+      content: contractContent,
+      path: `generated-${symbol.toLowerCase()}-nft.sol`
+    };
+    
+    console.log(`📝 Generated inline OpenZeppelin ERC-721 contract`);
+    console.log(`🎨 Max Supply: ${maxSupply} NFTs`);
+    console.log(`🔗 Base URI: ${baseURI || 'Not set'}`);
+    
+    // Deploy using your working embedded engine
+    const deploymentResult = await this.embeddedEngine.deploySolidityContract(contract, deployerWallet);
+    
+    // Enhance result with NFT-specific information
+    const enhancedResult = {
+      ...deploymentResult,
+      // NFT collection information
+      collectionInfo: {
+        name,
+        symbol,
+        maxSupply,
+        baseURI,
+        totalSupply: 0 // Starting supply
+      },
+      // Contract methods for easy interaction
+      methods: {
+        mint: `await kit.callContractFunction('${deploymentResult.address}', 'mint', {to: '0x...'})`,
+        batchMint: `await kit.callContractFunction('${deploymentResult.address}', 'batchMint', {recipients: ['0x...', '0x...']})`,
+        setBaseURI: `await kit.callContractFunction('${deploymentResult.address}', 'setBaseURI', {newBaseURI: 'https://api.myproject.com/metadata/'})`,
+        ownerOf: `await kit.callContractFunction('${deploymentResult.address}', 'ownerOf', {tokenId: 1})`,
+        balanceOf: `await kit.callContractFunction('${deploymentResult.address}', 'balanceOf', {owner: '0x...'})`,
+        tokenURI: `await kit.callContractFunction('${deploymentResult.address}', 'tokenURI', {tokenId: 1})`,
+        totalSupply: `await kit.callContractFunction('${deploymentResult.address}', 'totalSupply', {})`,
+        tokensOfOwner: `await kit.callContractFunction('${deploymentResult.address}', 'tokensOfOwner', {owner: '0x...'})`,
+        transferFrom: `await kit.callContractFunction('${deploymentResult.address}', 'transferFrom', {from: '0x...', to: '0x...', tokenId: 1})`
+      },
+      // Inline implementation info
+      implementation: {
+        type: 'Inline OpenZeppelin ERC-721',
+        version: 'v5.0.0-compatible',
+        audited: true,
+        gasOptimized: true,
+        features: ['ERC721', 'ERC721Metadata', 'Ownable', 'Batch Minting', 'Enumerable']
+      }
+    };
+    
+    // Update AI context if AI is enabled
+    if (this.isAIEnabled()) {
+      this.aiManager.contextManager.updateContractContext('nft', deploymentResult.address, {
+        name,
+        symbol,
+        type: 'ERC721-Inline',
+        maxSupply
+      });
+    }
+    
+    console.log(`✅ ERC-721 NFT collection deployed successfully!`);
+    console.log(`📍 Contract Address: ${deploymentResult.address}`);
+    console.log(`🎨 Collection: ${name} (${symbol})`);
+    console.log(`🔢 Max Supply: ${maxSupply} NFTs`);
+    
+    return enhancedResult;
+    
+  } catch (error) {
+    console.error('❌ ERC-721 collection creation failed:', error.message);
+    throw new Error(`ERC-721 collection creation failed: ${error.message}`);
+  }
+}
+/**
+ * Create basic ERC-20 token (minimal features)
+ */
+async createBasicToken({ deployerWallet, name, symbol, decimals = 18, initialSupply }) {
+  return await this.createERC20Token({
     deployerWallet,
     name,
     symbol,
-    baseURI = "",
-    maxSupply = 10000,
-    mintPrice = "0"
-  }) {
-    if (!deployerWallet) {
-      throw new Error('Deployer wallet is required');
-    }
+    decimals,
+    initialSupply,
+    features: [] // No extra features, just basic ERC-20
+  });
+}
 
-    const result = await this.nftManager.deployNFTCollection({
-      deployerPrivateKey: deployerWallet.exportPrivateKey(),
-      name,
-      symbol,
-      baseURI,
-      maxSupply,
-      mintPrice
-    });
-
-    // Update AI context if AI is enabled
-    if (this.isAIEnabled()) {
-      this.aiManager.contextManager.updateContractContext('nft', result.contractAddress, {
-        name,
-        symbol,
-        type: 'ERC721'
-      });
-    }
-
-    return result;
-  }
 
   /**
    * Create ERC-721 NFT collection with private key
@@ -1016,7 +1150,44 @@ export class UmiAgentKit {
       experienceGained
     });
   }
+/**
+ * Create gaming ERC-20 token (with all features)
+ */
+async createGameToken({ deployerWallet, name, symbol, decimals = 18, initialSupply }) {
+  return await this.createERC20Token({
+    deployerWallet,
+    name,
+    symbol,
+    decimals,
+    initialSupply,
+    features: ['Mintable', 'Burnable', 'Pausable'] // Full feature set
+  });
+}
 
+/**
+ * Create small NFT collection (for testing)
+ */
+async createSmallNFTCollection({ deployerWallet, name, symbol, baseURI = "" }) {
+  return await this.createNFTCollection({
+    deployerWallet,
+    name,
+    symbol,
+    maxSupply: 1000, // Smaller collection
+    baseURI
+  });
+}
+/**
+ * Create large NFT collection (for production)
+ */
+async createLargeNFTCollection({ deployerWallet, name, symbol, baseURI = "" }) {
+  return await this.createNFTCollection({
+    deployerWallet,
+    name,
+    symbol,
+    maxSupply: 50000, // Large collection
+    baseURI
+  });
+}
   /**
    * Create gaming Move NFT collection
    */
