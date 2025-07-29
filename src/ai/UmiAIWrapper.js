@@ -742,13 +742,13 @@ async sendETH({ fromAddress, toAddress, amount }) {
     let result;
     switch (deploymentType) {
       case 'module_only':
-        result = await this.umiKit.deploymentManager.deployContractsOnly(contractsPath, wallet);
+        result = await this.umiKit.deployContracts(contractsPath, wallet);
         break;
       case 'with_json':
-        result = await this.umiKit.deploymentManager.deployWithJson(contractsPath, wallet);
+        result = await this.umiKit.deployWithJson(contractsPath, wallet);
         break;
       case 'with_config':
-        result = await this.umiKit.deploymentManager.deployWithConfig(contractsPath, wallet, config);
+       result = await this.umiKit.deployWithConfig(contractsPath, wallet, config);
         break;
       default:
         throw new Error(`Unknown deployment type: ${deploymentType}`);
@@ -1265,5 +1265,231 @@ async getBalanceHistory({ limit = 10 }) {
     };
   }
 }
+/**
+ * 1. Scan contracts folder to see available contracts
+ * Command: "what contracts are in my ./contracts folder?"
+ */
+async scanContractsFolder({ contractsPath }) {
+  try {
+    console.log(`📁 AI: Scanning contracts in ${contractsPath}`);
+    
+    const contracts = await this.umiKit.scanContractsFolder(contractsPath);
+    
+    const contractInfo = contracts.map(contract => ({
+      name: contract.name,
+      fileName: contract.fileName,
+      type: contract.content.includes('module ') ? 'Move' : 'Solidity',
+      hasConstructor: contract.content.includes('init(') || contract.content.includes('constructor('),
+      linesOfCode: (contract.content.match(/\n/g) || []).length + 1,
+      path: contract.path
+    }));
+    
+    return {
+      success: true,
+      message: `Found ${contracts.length} contracts in ${contractsPath}`,
+      contracts: contractInfo,
+      contractsPath,
+      summary: {
+        total: contracts.length,
+        moveContracts: contractInfo.filter(c => c.type === 'Move').length,
+        solidityContracts: contractInfo.filter(c => c.type === 'Solidity').length,
+        withConstructors: contractInfo.filter(c => c.hasConstructor).length
+      }
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to scan contracts: ${error.message}`,
+      contracts: [],
+      error: error.message
+    };
+  }
+}
+/**
+ * 2. Get Move contracts specifically (with filtering)
+ * Command: "show me all the Move contracts I can deploy"
+ */
+async getMoveContracts({ contractsPath }) {
+  try {
+    console.log(`🔍 AI: Finding Move contracts in ${contractsPath}`);
+    
+    const contracts = await this.umiKit.scanContractsFolder(contractsPath);
+    
+    const moveContracts = contracts
+      .filter(contract => contract.content.includes('module '))
+      .map(contract => ({
+        name: contract.name,
+        fileName: contract.fileName,
+        type: 'Move',
+        hasInit: contract.content.includes('init('),
+        hasPublicFunctions: (contract.content.match(/public\s+fun/g) || []).length,
+        linesOfCode: (contract.content.match(/\n/g) || []).length + 1,
+        path: contract.path,
+        // Extract module name from content
+        moduleName: this.extractModuleName(contract.content)
+      }));
+    
+    return {
+      success: true,
+      message: `Found ${moveContracts.length} Move contracts in ${contractsPath}`,
+      contracts: moveContracts,
+      contractsPath,
+      totalScanned: contracts.length,
+      moveContractsFound: moveContracts.length
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to find Move contracts: ${error.message}`,
+      contracts: [],
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 3. Deploy contracts from a specific folder (flexible path)
+ * Commands: 
+ * - "deploy my contracts from contracts folder"
+ * - "deploy contracts from 'my-contracts' folder"
+ * - "deploy from ./game-contracts/"
+ */
+async deployFromFolder({ contractsPath, walletAddress, deploymentType = 'module_only' }) {
+  try {
+    console.log(`🚀 AI: Deploying contracts from ${contractsPath}`);
+    
+    // Handle wallet resolution
+    const wallet = this._getWallet(walletAddress);
+    
+    // Use the existing deployment function but with cleaner response
+    const result = await this.umiKit.deployContracts(contractsPath, wallet);
+    
+    const deployedList = Object.entries(result).map(([name, contract]) => ({
+      name,
+      address: contract.address,
+      transactionHash: contract.hash || contract.txHash,
+      deployer: wallet.getAddress(),
+      type: contract.type || (contract.content?.includes('module ') ? 'Move' : 'Solidity'),
+      status: contract.hash ? 'deployed' : 'unknown'
+    }));
+
+    return {
+      success: true,
+      message: `Successfully deployed ${deployedList.length} contracts from ${contractsPath}`,
+      contracts: deployedList,
+      deploymentType,
+      walletUsed: wallet.getAddress(),
+      contractsPath,
+      transactionHashes: deployedList.map(c => c.transactionHash).filter(Boolean)
+    };
+    
+  } catch (error) {
+    console.error('❌ Deployment error:', error);
+    return {
+      success: false,
+      message: `Deployment failed: ${error.message}`,
+      contracts: [],
+      error: error.message,
+      contractsPath
+    };
+  }
+}
+
+/**
+ * 4. Deploy with dynamic configuration object
+ * Command: "deploy GameToken with name 'DragonCoin' and symbol 'DRAGON'"
+ */
+async deployWithDynamicConfig({ contractsPath, walletAddress, contractName, config = {} }) {
+  try {
+    console.log(`🚀 AI: Deploying ${contractName} with dynamic config from ${contractsPath}`);
+    
+    const wallet = this._getWallet(walletAddress);
+    
+    // Create configuration object for specific contract
+    const deploymentConfig = {
+      [contractName]: config
+    };
+    
+    // Use deployWithConfig method
+    const result = await this.umiKit.deployWithConfig(contractsPath, wallet, deploymentConfig);
+    
+    const deployedList = Object.entries(result).map(([name, contract]) => ({
+      name,
+      address: contract.address,
+      transactionHash: contract.hash || contract.txHash,
+      deployer: wallet.getAddress(),
+      type: contract.type || 'Move',
+      status: contract.hash ? 'deployed' : 'unknown',
+      configUsed: deploymentConfig[name] || {}
+    }));
+
+    return {
+      success: true,
+      message: `Successfully deployed ${contractName} with custom configuration`,
+      contracts: deployedList,
+      contractName,
+      configUsed: config,
+      walletUsed: wallet.getAddress(),
+      contractsPath,
+      transactionHashes: deployedList.map(c => c.transactionHash).filter(Boolean)
+    };
+    
+  } catch (error) {
+    console.error('❌ Dynamic deployment error:', error);
+    return {
+      success: false,
+      message: `Dynamic deployment failed: ${error.message}`,
+      contracts: [],
+      error: error.message,
+      contractName,
+      configAttempted: config
+    };
+  }
+}
+
+/**
+ * Helper method to extract module name from Move contract content
+ */
+extractModuleName(content) {
+  const moduleMatch = content.match(/module\s+([^:\s]+)::\s*([^{\s]+)/);
+  if (moduleMatch) {
+    return `${moduleMatch[1]}::${moduleMatch[2]}`;
+  }
+  return 'unknown';
+}
+
+/**
+ * Helper method to get wallet with error handling (reused)
+ */
+_getWallet(walletAddress) {
+  let actualWalletAddress = walletAddress;
+  
+  // Handle "my" wallet references
+  if (walletAddress === 'my' || walletAddress === 'mine' || walletAddress === 'default') {
+    const context = this.umiKit.aiManager?.contextManager?.getContext();
+    actualWalletAddress = context?.defaultWallet || context?.userWallet;
+    
+    if (!actualWalletAddress) {
+      const wallets = this.umiKit.getAllWallets();
+      if (wallets && wallets.length > 0) {
+        actualWalletAddress = wallets[0].getAddress();
+        console.log(`📝 Using first available wallet: ${actualWalletAddress}`);
+      } else {
+        throw new Error('No default wallet set and no wallets available. Please create or import a wallet first.');
+      }
+    }
+  }
+  
+  const wallet = this.umiKit.walletManager.getWallet(actualWalletAddress);
+  if (!wallet) {
+    throw new Error(`Wallet not found: ${actualWalletAddress}. Available wallets: ${this.umiKit.getAllWallets().map(w => w.getAddress()).join(', ')}`);
+  }
+  
+  return wallet;
+}
+
+
 
 }

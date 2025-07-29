@@ -111,42 +111,79 @@ export class EmbeddedDeploymentEngine {
   /**
    * Compile Solidity contract using solc directly
    */
-  compileSolidityContract(contract) {
-    console.log('🔨 Compiling Solidity contract...');
-    
-    const input = {
-      language: 'Solidity',
-      sources: {
-        [contract.name + '.sol']: {
-          content: contract.content
-        }
-      },
-      settings: {
-        outputSelection: {
-          '*': {
-            '*': ['abi', 'evm.bytecode']
-          }
-        }
+ compileSolidityContract(contract) {
+  console.log('🔨 Compiling Solidity contract...');
+  
+  const input = {
+    language: 'Solidity',
+    sources: {
+      [contract.name + '.sol']: {
+        content: contract.content
       }
-    };
-
-    const output = JSON.parse(solc.compile(JSON.stringify(input)));
-    
-    if (output.errors) {
-      const hasErrors = output.errors.some(error => error.severity === 'error');
-      if (hasErrors) {
-        throw new Error(`Compilation failed: ${output.errors.map(e => e.message).join(', ')}`);
+    },
+    settings: {
+      outputSelection: {
+        '*': {
+          '*': ['abi', 'evm.bytecode']
+        }
       }
     }
+  };
 
-    const contractOutput = output.contracts[contract.name + '.sol'][contract.name];
-    
-    return {
-      abi: contractOutput.abi,
-      bytecode: contractOutput.evm.bytecode.object
-    };
+  const output = JSON.parse(solc.compile(JSON.stringify(input)));
+  
+  // Check for compilation errors
+  if (output.errors) {
+    const hasErrors = output.errors.some(error => error.severity === 'error');
+    if (hasErrors) {
+      console.error('❌ Compilation errors:', output.errors);
+      throw new Error(`Compilation failed: ${output.errors.map(e => e.message).join(', ')}`);
+    }
+    // Show warnings but continue
+    const warnings = output.errors.filter(error => error.severity === 'warning');
+    if (warnings.length > 0) {
+      console.warn('⚠️ Compilation warnings:', warnings.map(w => w.message).join(', '));
+    }
   }
 
+  // FIXED: Better error handling for missing contract output
+  const fileName = contract.name + '.sol';
+  
+  if (!output.contracts) {
+    console.error('❌ No contracts found in compilation output:', output);
+    throw new Error('Compilation failed: No contracts generated');
+  }
+  
+  if (!output.contracts[fileName]) {
+    console.error('❌ Contract file not found in output:', Object.keys(output.contracts));
+    throw new Error(`Contract file ${fileName} not found in compilation output`);
+  }
+  
+  if (!output.contracts[fileName][contract.name]) {
+    console.error('❌ Contract not found in file:', Object.keys(output.contracts[fileName]));
+    throw new Error(`Contract ${contract.name} not found in file ${fileName}. Available: ${Object.keys(output.contracts[fileName]).join(', ')}`);
+  }
+
+  const contractOutput = output.contracts[fileName][contract.name];
+  
+  // FIXED: Validate contract output has required fields
+  if (!contractOutput.abi) {
+    throw new Error('Contract compilation failed: ABI not generated');
+  }
+  
+  if (!contractOutput.evm || !contractOutput.evm.bytecode || !contractOutput.evm.bytecode.object) {
+    throw new Error('Contract compilation failed: Bytecode not generated');
+  }
+  
+  console.log('✅ Contract compiled successfully');
+  console.log(`📋 ABI length: ${contractOutput.abi.length} functions`);
+  console.log(`💾 Bytecode length: ${contractOutput.evm.bytecode.object.length} characters`);
+  
+  return {
+    abi: contractOutput.abi,
+    bytecode: contractOutput.evm.bytecode.object
+  };
+}
   /**
    * Wrap bytecode for Umi Network using BCS serialization
    */

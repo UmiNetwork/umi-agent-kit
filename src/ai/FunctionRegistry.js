@@ -145,6 +145,46 @@ export class FunctionRegistry {
       execute: this.aiWrapper.sendETH.bind(this.aiWrapper)
     });
 
+    /**
+ * 1. Scan contracts folder
+ * Usage: "what contracts are in my ./contracts folder?"
+ */
+
+    this.registerFunction('scan_contracts_folder', {
+  description: 'Scan a folder to see what contracts are available for deployment',
+  parameters: {
+    type: 'object',
+    properties: {
+      contractsPath: {
+        type: 'string',
+        description: 'Path to folder containing contract files (.move or .sol files)'
+      }
+    },
+    required: ['contractsPath']
+  },
+  execute: this.aiWrapper.scanContractsFolder.bind(this.aiWrapper)
+});
+
+
+/**
+ * 2. Get Move contracts specifically
+ * Usage: "show me all the Move contracts I can deploy"
+ */
+this.registerFunction('get_move_contracts', {
+  description: 'Find and analyze all Move contracts in a folder',
+  parameters: {
+    type: 'object',
+    properties: {
+      contractsPath: {
+        type: 'string',
+        description: 'Path to folder containing contract files'
+      }
+    },
+    required: ['contractsPath']
+  },
+  execute: this.aiWrapper.getMoveContracts.bind(this.aiWrapper)
+});
+
     // Create ERC-20 token
     this.registerFunction('create_erc20_token', {
       description: 'Create a new ERC-20 token contract',
@@ -177,7 +217,75 @@ export class FunctionRegistry {
       },
       execute: this.aiWrapper.createERC20Token.bind(this.aiWrapper)
     });
-
+/**
+ * 3. Deploy contracts from folder (flexible)
+ * Usage: 
+ * - "deploy my contracts from contracts folder"
+ * - "deploy contracts from 'my-contracts' folder"
+ */
+this.registerFunction('deploy_from_folder', {
+  description: 'Deploy contracts from a specified folder path',
+  parameters: {
+    type: 'object',
+    properties: {
+      contractsPath: {
+        type: 'string',
+        description: 'Path to folder containing contract files to deploy'
+      },
+      walletAddress: {
+        type: 'string',
+        description: 'Wallet address to deploy contracts from, or "my" for default wallet'
+      },
+      deploymentType: {
+        type: 'string',
+        enum: ['module_only', 'with_json', 'with_config'],
+        description: 'Type of deployment to perform',
+        default: 'module_only'
+      }
+    },
+    required: ['contractsPath', 'walletAddress']
+  },
+  execute: this.aiWrapper.deployFromFolder.bind(this.aiWrapper)
+});
+/**
+ * 4. Deploy with dynamic configuration
+ * Usage: "deploy GameToken with name 'DragonCoin' and symbol 'DRAGON'"
+ */
+this.registerFunction('deploy_with_dynamic_config', {
+  description: 'Deploy a specific contract with dynamic configuration parameters',
+  parameters: {
+    type: 'object',
+    properties: {
+      contractsPath: {
+        type: 'string',
+        description: 'Path to folder containing the contract file'
+      },
+      walletAddress: {
+        type: 'string',
+        description: 'Wallet address to deploy from, or "my" for default wallet'
+      },
+      contractName: {
+        type: 'string',
+        description: 'Name of the specific contract to deploy'
+      },
+      config: {
+        type: 'object',
+        description: 'Configuration object with parameters like name, symbol, supply, etc.',
+        properties: {
+          name: { type: 'string', description: 'Token/Contract name' },
+          symbol: { type: 'string', description: 'Token symbol' },
+          decimals: { type: 'number', description: 'Token decimals' },
+          initial_supply: { type: 'number', description: 'Initial token supply' },
+          maxSupply: { type: 'number', description: 'Maximum NFT supply' },
+          baseURI: { type: 'string', description: 'Base URI for NFT metadata' }
+        },
+        default: {}
+      }
+    },
+    required: ['contractsPath', 'walletAddress', 'contractName']
+  },
+  execute: this.aiWrapper.deployWithDynamicConfig.bind(this.aiWrapper)
+});
     // Create Move token
     this.registerFunction('create_move_token', {
       description: 'Create a new Move token contract',

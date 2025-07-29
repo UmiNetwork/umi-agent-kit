@@ -4,10 +4,6 @@ export { UmiWallet, ethToMoveAddress, moveToEthAddress } from './wallet/UmiWalle
 export { WalletManager } from './wallet/WalletManager.js';
 export { UmiClient } from './client/UmiClient.js';
 export { TransferManager } from './transfer/TransferManager.js';
-export { TokenManager } from './token/TokenManager.js';
-export { NFTManager } from './nft/NFTManager.js';
-export { SolidityCompiler } from './compiler/SolidityCompiler.js';
-export { NFTCompiler } from './compiler/NFTCompiler.js';
 export { MoveNFTCompiler } from './compiler/MoveNFTCompiler.js';
 export { DEFAULT_CONFIG } from './config.js';
 
@@ -26,7 +22,7 @@ export { NotificationService } from './multisig/NotificationService.js';
 export { MultisigStorage } from './multisig/MultisigStorage.js';
 
 // NEW: Deployment exports (FIXED PATHS)
-export { MultiContractDeployer } from './deployment/MultiContractDeployer.js';
+
 export { DependencyResolver } from './deployment/DependencyResolver.js';
 export { MoveDeploymentEngine } from './deployment/MoveDeploymentEngine.js'; 
 

@@ -28,3 +28,5 @@ diagnostic-scripts.js
 diagnostic-scripts/
 test-deployment.js
 test-inline-tokens-nfts.js
+my-contracts
+contracts/
