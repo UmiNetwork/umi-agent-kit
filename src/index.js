@@ -28,3 +28,14 @@ export { MoveDeploymentEngine } from './deployment/MoveDeploymentEngine.js';
 
 export { ERC1155Manager } from './erc1155/ERC1155Manager.js';
 export { ERC1155Compiler } from './compiler/ERC1155Compiler.js';
+
+// NEW: template exports
+export { OllamaTemplate } from './ai/templates/OllamaTemplate.js';
+export { OpenAITemplate } from './ai/templates/OpenAITemplate.js';
+export { CustomTemplate, createTradingTemplate, createGamingTemplate } from './ai/templates/CustomTemplate.js';
+export { 
+    SimpleTemplate, 
+    createTradingSimpleTemplate, 
+    createGamingSimpleTemplate, 
+    createDeFiSimpleTemplate 
+} from './ai/templates/SimpleTemplate.js';
