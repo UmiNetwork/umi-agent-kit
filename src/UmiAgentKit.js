@@ -13,10 +13,14 @@ import { ERC1155Manager } from './erc1155/ERC1155Manager.js';
 import { EmbeddedDeploymentEngine } from './deployment/EmbeddedDeploymentEngine.js';
 import { InlineOpenZeppelinTemplates } from './templates/InlineOpenZeppelinTemplates.js';
 
-
-
 import fs from 'fs/promises';
 import path from 'path';
+
+import { OllamaTemplate } from './ai/templates/OllamaTemplate.js';
+import { OpenAITemplate } from './ai/templates/OpenAITemplate.js';
+import { CustomTemplate } from './ai/templates/CustomTemplate.js';
+import { SimpleTemplate } from './ai/templates/SimpleTemplate.js';
+
 export class UmiAgentKit {
   constructor(config = {}) {
     // Set default config
@@ -39,7 +43,7 @@ export class UmiAgentKit {
     // Initialize transfer manager
     this.transferManager = new TransferManager(this.client, this.client.chain);
 
-   
+    this.originalAIManager = null;  // Store original AI for fallback
 
   
 
@@ -183,6 +187,100 @@ export class UmiAgentKit {
 
     this.aiManager.setupForQuickOps();
   }
+
+  /**
+   * use a custom AI template instead of Groq
+   * @param {Object} template - AI template instance (OllamaTemplate, OpenAITemplate, etc.)
+   * @returns {Promise<boolean>} Success status
+   */
+
+  async useAI(template) {
+    try {
+        console.log('🔌 Setting up custom AI template...');
+        
+        // Initialize the template
+        const initialized = await template.initialize();
+        if (!initialized) {
+            throw new Error('Template initialization failed');
+        }
+
+         this.config.aiEnabled = true;
+        // Store original AI manager for fallback
+        if (this.aiManager && !this.originalAIManager) {
+            this.originalAIManager = { ...this.aiManager };
+        }
+
+        // Replace AI manager with template
+        this.aiManager = {
+            // Keep existing properties
+            ...this.aiManager,
+            
+            // Replace chat method with template
+            chat: async (message) => {
+                try {
+                    return await template.chat(message);
+                } catch (error) {
+                    console.log('🔄 Template failed, trying fallback...');
+                    
+                    // Fallback to original Groq if available
+                    if (this.originalAIManager && this.originalAIManager.chat) {
+                        console.log('🔄 Using original Groq AI...');
+                        return await this.originalAIManager.chat(message);
+                    }
+                    
+                    throw error;
+                }
+            },
+            
+            // Add template management methods
+            template: template,
+            getTemplateInfo: () => template.getInfo(),
+            validateTemplate: () => template.validate(),
+            
+            // Keep original methods for fallback
+            originalChat: this.originalAIManager?.chat
+        };
+
+        // Mark template as enabled
+        this.config.templateEnabled = true;
+        
+        console.log(`✅ Custom AI template enabled: ${template.getInfo().name}`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Failed to enable AI template:', error.message);
+        return false;
+    }
+}
+
+/**
+ * Switch back to original Groq AI
+ * @returns {boolean} Success status
+ */
+switchToOriginalAI() {
+    if (this.originalAIManager) {
+        this.aiManager = { ...this.originalAIManager };
+        this.config.templateEnabled = false;
+        console.log('🔄 Switched back to original Groq AI');
+        return true;
+    }
+    console.log('❌ No original AI manager available');
+    return false;
+}
+
+/**
+ * Get current AI status
+ * @returns {Object} AI status information
+ */
+getAIStatus() {
+    return {
+        templateEnabled: this.config.templateEnabled || false,
+        originalAIAvailable: !!this.originalAIManager,
+        currentTemplate: this.aiManager?.template?.getInfo() || null,
+        groqEnabled: this.config.aiEnabled || false
+    };
+}
+
 
   // ====== WALLET OPERATIONS ======
 
