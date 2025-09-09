@@ -1,0 +1,20 @@
+{
+  "network": "devnet",
+  "rpcUrl": "https://devnet.moved.network",
+  "moveCompilation": {
+    "enabled": true,
+    "useEmbedded": true,
+    "aptosFrameworkVersion": "aptos-release-v1.27"
+  },
+  "deployment": {
+    "timeout": 120000,
+    "gasLimit": 10000000,
+    "gasPrice": 20000000000
+  },
+  "setup": {
+    "timestamp": "2025-09-08T22:02:50.640Z",
+    "version": "3.9.1",
+    "platform": "linux",
+    "nodeVersion": "v18.19.1"
+  }
+}

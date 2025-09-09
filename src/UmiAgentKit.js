@@ -409,13 +409,14 @@ getAIStatus() {
   /**
    * Send ETH from wallet to another address
    */
-  async sendETH({ fromWallet, to, amount, gasLimit, gasPrice }) {
-    if (!fromWallet) {
+  async sendETH({ from, to, amount, gasLimit, gasPrice }) {
+   
+    if (!from) {
       throw new Error('From wallet is required');
     }
     
     return await this.transferManager.sendETH({
-      fromPrivateKey: fromWallet.exportPrivateKey(),
+      fromPrivateKey: from.exportPrivateKey(),
       to,
       amount,
       gasLimit,
