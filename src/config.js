@@ -3,7 +3,7 @@ export const DEFAULT_CONFIG = {
   devnet: {
     name: 'Umi Devnet',
     rpcUrl: 'https://devnet.uminetwork.com',
-    chainId: 42609,
+    chainId: 42069,
     currency: {
       decimals: 18,
       name: 'Ether',
