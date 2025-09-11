@@ -1,6 +1,6 @@
 {
   "network": "devnet",
-  "rpcUrl": "https://devnet.moved.network",
+  "rpcUrl": "https://devnet.uminetwork.com",
   "moveCompilation": {
     "enabled": true,
     "useEmbedded": true,
